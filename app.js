@@ -11,16 +11,45 @@ for (var i = 0; i < birthData.length; i++) {
     months.push(month);
   }
 }
+var seasons = [1,2,3,4];
+var colors = [
+  "#aec7e8", "#a7cfc9", "#9fd7a9", "#98df8a", "#bac78e", "#ddb092",
+  "#ff9896", "#ffa48c", "#ffaf82", "#ffbb78", "#e4bf9d", "#c9c3c3"
+];
 var colorScale = d3.scaleOrdinal()
                    .domain(months)
-                   .range(d3.schemeCategory20);
-                   
-d3.select('svg')
+                   .range(colors);
+
+var quarterColors = ["#1f77b4", "#2ca02c", "#d62728", "#ff7f0e"];
+                
+d3.select('input')
+  .property('min',minYear)
+  .property('max',maxYear)
+  .property('value',minYear)
+  .on('input',function(){
+    makeGraph(+d3.event.target.value);
+  });
+  
+var svg = d3.select('svg')
     .attr('width', width)
-    .attr('height', height)
+    .attr('height', height);
+    
+  svg
   .append('g')
     .attr('transform', 'translate(' + width / 2 + ', ' + height / 2 + ')')
     .classed('chart', true);
+    
+  svg
+  .append('g')
+    .attr('transform', 'translate(' + width / 2 + ', ' + height / 2 + ')')
+    .classed('inner-chart', true);
+
+    svg
+    .append('text')
+    .classed('title',true)
+    .attr('x',width/2)
+    .attr('y',30)
+    .attr('text-anchor','middle');
 
 makeGraph(minYear);
 
@@ -51,39 +80,69 @@ function makeGraph(year){
       d.monthNum = 11;
    }else if(d.month === 'December'){  
       d.monthNum = 12;
-   }   
+   }
   });
+  
   var arcs = d3.pie()
              .value(d => d.births)
-             .sort((a,b) =>{
-                 if(a.monthNum > b.monthNum){
-                  return 1;
-                }else if(a.monthNum < b.monthNum){
-                  return -1;
-                }else{
-                  return a.births - b.births;
-                }})
-             (yearData);
-
+             .sort((a,b) => a.monthNum > b.monthNum);
+                
+  var innearcs = d3.pie()
+                    .value(d => d.births)
+                    .sort((a,b) => a.quarter - b.quarter);
   var path = d3.arc()
-             .outerRadius(width / 2 - 10)
+             .outerRadius(width / 2 - 40)
              .innerRadius(width / 4)
               .padAngle(.01)
              .cornerRadius(20);
+             
+  var innerPath = d3.arc()
+                .outerRadius(width / 4)
+                .innerRadius(0)
+                .padAngle(.01)
+                .cornerRadius(20);
 
-  var update = d3.select('.chart')
+  var outer = d3.select('.chart')
                   .selectAll('.arc')
-                  .data(arcs);
+                  .data(arcs(yearData));
+                  
+  var inner = d3.select('.inner-chart')
+                  .selectAll('.arc')
+                  .data(innearcs(getQuarter(yearData)));
+  
+  outer.exit().remove();
 
-  update.exit().remove();
-
-  update
-      .enter()
+  var entered = outer
+                .enter();
+    entered            
     .append('path')
       .classed('arc', true)
-    .merge(update)
+    .merge(outer)
       .attr('fill', d => colorScale(d.data.month))
       .attr('stroke', 'black')
       .attr('d', path);
+    
+  
+  inner.exit().remove();
 
+  inner
+   .enter()            
+    .append('path')
+      .classed('arc', true)
+    .merge(inner)
+      .attr('fill', (d,i) => quarterColors[i])
+      .attr('stroke', 'black')
+      .attr('d', innerPath);
+    
+    d3.select('.title')
+        .text('Birth by months and quarter for ' + year);
+}
+
+function getQuarter(data){
+    var quartertallies = [0,1,2,3].map(n => ({quarter: n, births: 0}));
+    data.forEach(d =>{
+        var quarter = Math.floor((d.monthNum - 1)/3);
+        quartertallies[quarter].births += d.births;
+    });
+    return quartertallies;
 }
